@@ -33,7 +33,7 @@ func FormHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Отображаем форму для ввода URL RSS-канала
 	w.Header().Set("Content-Type", "text/html")
-	http.ServeFile(w, r, "/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.3/form.html")
+	http.ServeFile(w, r, "./0.3/form.html")
 }
 
 func NewsHandler(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func NewsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Отображаем ссылки на новости с использованием шаблона news.html
-	tmpl, err := template.ParseFiles("/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.3/news.html")
+	tmpl, err := template.ParseFiles("./0.3/news.html")
 	if err != nil {
 		http.Error(w, "Ошибка при загрузке шаблона", http.StatusInternalServerError)
 		return

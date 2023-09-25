@@ -36,7 +36,7 @@ func FormHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Отображаем форму для ввода данных
 	w.Header().Set("Content-Type", "text/html")
-	http.ServeFile(w, r, "/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.1/form.html")
+	http.ServeFile(w, r, "./0.1/form.html")
 }
 
 func DataHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func DataHandler(w http.ResponseWriter, r *http.Request) {
 	defer mutex.Unlock()
 
 	// Читаем содержимое файла "data.html"
-	htmlContent, err := ioutil.ReadFile("/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.1/data.html")
+	htmlContent, err := ioutil.ReadFile("./0.1/data.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

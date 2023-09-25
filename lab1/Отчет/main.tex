@@ -162,16 +162,16 @@
 \vspace{11em}
 
 \begin{center}
-\Large {\bf Лабораторная работа № 1} \\
-\large {\bf по курсу <<Языки и методы программирования>>} \\
-\large <<Перегрузка операций>> 
+\Large {\bf Лабораторная работа № 1} \\ 
+\large {\bf по курсу <<Компьютерные сети>>} \\
+\large <<web-сервера>> 
 \end{center}\normalsize
 
 \vspace{8em}
 
 
 \begin{flushright}
-  {Студент группы ИУ9-22Б Волохов А. В. \hspace*{15pt}\\ 
+  {Студент группы ИУ9-32Б Волохов А. В. \hspace*{15pt}\\ 
   \vspace{2ex}
   Преподаватель Посевин Д. П.\hspace*{15pt}}
 \end{flushright}
@@ -196,203 +196,304 @@
 \setcounter{page}{2}
 
 \section{Задание}\label{Sect::task}
-Данная работа предназначена для изучения возможностей языка C++,
-обеспечивающих применение знаков операций к объектам пользовательских типов
-
-Требуется составить шаблон класса,
-перегрузив указанные операции. 
-
-Table<T> – таблица, в ячейках которой
-размещены значения числового типа T, а
-столбцы имеют строковые имена.
-Конструктор класса Table<T> должен
-формировать пустую таблицу, состоящую из
-одного столбца с указанным именем.
-Подразумевается, что более сложные таблицы
-можно построить из столбцов с помощью
-перегруженных операций:
+Рассматривается задача разработки web-сервера на языке GO на основе пакета net/http. 
+Необходимо:
 \begin{itemize}
-\item «+» – соединение двух таблиц, в
-результате которой формируется третья
-таблица по следующим правилам:
-(a) множество имён столбцов
-результирующей таблицы является
-объединением множеств имён столбцов
-исходных таблиц;
-(b) если число строк в одной из
-соединяемых таблиц меньше числа строк
-во второй, то будем считать, что она
-содержит нужное количество строк,
-забитых нулями и расположенных внизу
-таблицы;
-(c) если имеется имя столбца,
-присутствующее как в первой из
-соединяемых таблиц, так и во второй, то
-соответствующий столбец
-результирующей таблицы должен
-содержать суммы соответствующих
-столбцов исходных таблиц;
-(d) столбец, имя которого присутствует
-только в одной из соединяемых таблиц,
-просто копируется в результирующую
-таблицу;
-\item «%» – добавление в конец таблицы
-строки, во всех ячейках которой
-находится указанное значение;
-\item «[ ]» – получение временного объекта,
-обозначающего строку таблицы, к
-которому, в свою очередь, может быть
-применена операция «[ ]», принимающая
-в качестве параметра имя столбца, для
-получения ссылки на ячейку строки;
-\item «size » – получение количества строк в
-таблице;
-\item «<<» – вывод таблицы в поток вывода.
+\item Реализовать web-сервер и запустить на заданном порте.
+\item Изучить принимаемые web-сервером параметры, реализовать передачу данных методом РОST. Вывести значения введенные в форму
+\item Реализовать вывод форматированного гипертекста с контекстным меню в виде гиперссылок, при клике на гиперссылку должна выполняться подмена контента;
 \end{itemize}
-
+Далее рассматривается задача разработки приложения на языке GO реализующего синтаксический разбор XML файла формата RSS. 
+Необходимо Реализовать получение данных из различных RSS- каналов по вариантам. Сравнить результаты разбора и сделать выводы.
+В итоге необходимо разработать web-сервер, который выполняет соединение с удаленным (удаленными) серверами RSS-новостей и возвращает результаты обработки данных в структурированном виде (страница гипертекста) web-клиенту, в нашем случае в браузер по вариантам.
 \section{Результаты}\label{Sect::res}
 
 Исходный код программы представлен в листингах~\ref{lst:code1}--~\ref{lst:code2}--~\ref{lst:code3}.
 
 \begin{figure}[!htb]
-\begin{lstlisting}[language={C++},caption={Class Table},label={lst:code1}]
-#include <iostream>
-#include <vector>
-#include <string>
-#include <algorithm>
+\begin{lstlisting}[language={Go},caption={o.1.go},label={lst:code1}]
+package main
 
-template<typename T>
-class Table {
-private:
-    std::vector<std::string> columnNames;
-    std::vector<std::vector<T>> data;
+import (
+	"fmt"
+	"html/template"
+	"io/ioutil"
+	"net/http"
+	"sync"
+)
 
-public:
-    explicit Table(const std::string& columnName) {
-        columnNames.push_back(columnName);
-    }
+var data struct {
+	Name string
+	Age  string
+}
 
-    Table operator+(const Table& other) const {
-        Table result = *this;
+var mutex sync.Mutex
 
-        for (const auto& columnName : other.columnNames) {
-            if (std::find(result.columnNames.begin(), result.columnNames.end(), columnName) == result.columnNames.end()) {
-                result.columnNames.push_back(columnName);
-            }
-        }
+func FormHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		name := r.FormValue("name")
+		age := r.FormValue("age")
 
-        size_t numRows = std::max(result.data.size(), other.data.size());
-        result.data.resize(numRows);
+		mutex.Lock()
+		data.Name = name
+		data.Age = age
+		mutex.Unlock()
 
-        for (size_t i = 0; i < numRows; i++) {
-            result.data[i].resize(result.columnNames.size());
-        }
+		http.Redirect(w, r, "/data", http.StatusSeeOther)
+		return
+	}
 
-        for (size_t col = 0; col < result.columnNames.size(); col++) {
-            std::string columnName = result.columnNames[col];
-            size_t columnIndex = getColumnIndex(columnName);
-            size_t otherColumnIndex = other.getColumnIndex(columnName);
+	w.Header().Set("Content-Type", "text/html")
+	http.ServeFile(w, r, "/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.1/form.html")
+}
 
-            if (columnIndex != -1 && otherColumnIndex != -1) {
-                for (size_t i = 0; i < numRows; i++) {
-                    result.data[i][col] = data[i][columnIndex] + other.data[i][otherColumnIndex];
-                }
-            } else if (otherColumnIndex != -1) {
-                for (size_t i = 0; i < numRows; i++) {
-                    result.data[i][col] = other.data[i][otherColumnIndex];
-                }
-            }
-        }
-
-        return result;
-    }
+func DataHandler(w http.ResponseWriter, r *http.Request) {
+	mutex.Lock()
+	defer mutex.Unlock()
 \end{lstlisting}
 \end{figure}
+
 \newpage
+
 \begin{figure}[!htb]
-\begin{lstlisting}[language={C++},caption={Class Table (продолжение)},label={lst:code2}]
-Table& operator%(const T& value) {
-        std::vector<T> newRow(columnNames.size(), value);
-        data.push_back(newRow);
+\begin{lstlisting}[language={Go},caption={o.1.go - продолжение},label={lst:code2}]
+	htmlContent, err := ioutil.ReadFile("/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.1/data.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
-        return *this;
-    }
+	tmpl, err := template.New("data").Parse(string(htmlContent))
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
-    std::vector<T>& operator[](size_t rowIndex) {
-        return data[rowIndex];
-    }
+	w.Header().Set("Content-Type", "text/html")
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
 
-    [[nodiscard]] size_t size() const {
-        return data.size();
-    }
+func main() {
+	http.HandleFunc("/", FormHandler)
+	http.HandleFunc("/data", DataHandler)
 
-    friend std::ostream& operator<<(std::ostream& os, const Table& table) {
-        for (const auto& columnName : table.columnNames) {
-            os << columnName << '\t';
-        }
-        os << '\n';
-
-        size_t numRows = table.size();
-        size_t numColumns = table.columnNames.size();
-        for (size_t row = 0; row < numRows; row++) {
-            for (size_t col = 0; col < numColumns; col++) {
-                os << table.data[row][col] << '\t';
-            }
-            os << '\n';
-        }
-
-        return os;
-    }
-
-
-private:
-    [[nodiscard]] int getColumnIndex(const std::string& columnName) const {
-        auto it = std::find(columnNames.begin(), columnNames.end(), columnName);
-
-        if (it != columnNames.end()) {
-            return std::distance(columnNames.begin(), it);
-        }
-
-        return -1;
-    }
-};
-\end{lstlisting}
-\end{figure}
-\begin{figure}[!htb]
-\begin{lstlisting}[language={C++},caption={Main (в том же файле)},label={lst:code3}]
-int main() {
-    Table<int> table1("Column1");
-    table1 % 10;
-    table1 % 20;
-    table1 % 30;
-
-    Table<int> table2("Column2");
-    table2 % 100;
-    table2 % 200;
-    table2 % 300;
-    table2 % 100;
-
-    Table<int> table3 = table1 + table2;
-
-    std::cout << table3 << std::endl;
-    std::cout << table3[0][1] << std::endl;
-    std::cout << table3.size() << std::endl;
-
-    Table<int> table4("Column1");
-    table4 % 1;
-    table4 % 2;
-    table4 % 3;
-    table4 % 4;
-
-    table4 = table3 + table4;
-    std::cout << table4 << std::endl;
-
-    return 0;
+	err := http.ListenAndServe(":9000", nil)
+	if err != nil {
+		fmt.Println("Server error:", err)
+	}
 }
 \end{lstlisting}
 \end{figure}
 
 \newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={HTML},caption={form.html},label={lst:code3}]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Form</title>
+</head>
+<body>
+<h1>Enter the data:</h1>
+<form action="/" method="post">
+  <label for="name">Name:</label>
+  <input type="text" id="name" name="name"><br><br>
+
+  <label for="age">Age:</label>
+  <input type="text" id="age" name="age"><br><br>
+
+  <input type="submit" value="Send">
+</form>
+</body>
+</html>
+\end{lstlisting}
+\end{figure}
+\newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={HTML},caption={data.html},label={lst:code4}]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Form data</title>
+</head>
+<body>
+<h1>Form data:</h1>
+<p>Name: {{.Name}}</p>
+<p>Age: {{.Age}}</p>
+</body>
+</html>
+
+\end{lstlisting}
+\end{figure}
+\newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={Go},caption={o.2.go},label={lst:code5}]
+package main
+
+import (
+	"fmt"
+	"github.com/mmcdole/gofeed"
+	"log"
+)
+
+func main() {
+	fp := gofeed.NewParser()
+
+	rssUrls := []string{
+		"https://vesti-k.ru/rss/",
+	}
+
+	for _, url := range rssUrls {
+		feed, err := fp.ParseURL(url)
+		if err != nil {
+			log.Fatalf("Error parsing RSS from URL %s: %v\n", url, err)
+		}
+
+		fmt.Printf("Title : %s\n", feed.Title)
+		fmt.Printf("Description : %s\n", feed.Description)
+		fmt.Printf("Number of Items : %d\n", len(feed.Items))
+
+		for i, item := range feed.Items {
+			fmt.Println()
+			fmt.Printf("Item Number : %d\n", i)
+			fmt.Printf("Title : %s\n", item.Title)
+			fmt.Printf("Link : %s\n", item.Link)
+			fmt.Printf("Description : %s\n", item.Description)
+			fmt.Printf("Published Date : %s\n", item.Published)
+		}
+	}
+}
+\end{lstlisting}
+\end{figure}
+
+\newpage
+
+\begin{figure}[!htb]
+\begin{lstlisting}[language={Go},caption={o.3.go},label={lst:code6}]
+package main
+
+import (
+	"fmt"
+	"github.com/mmcdole/gofeed"
+	"html/template"
+	"net/http"
+	"sync"
+)
+
+var data struct {
+	RssUrl string
+}
+
+var mutex sync.Mutex
+
+func FormHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		rssUrl := r.FormValue("rssUrl")
+
+		mutex.Lock()
+		data.RssUrl = rssUrl
+		mutex.Unlock()
+
+		http.Redirect(w, r, "/news", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	http.ServeFile(w, r, "/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.3/form.html")
+}
+
+func NewsHandler(w http.ResponseWriter, r *http.Request) {
+	mutex.Lock()
+	rssUrl := data.RssUrl
+	mutex.Unlock()
+
+	fp := gofeed.NewParser()
+	feed, err := fp.ParseURL(rssUrl)
+	if err != nil {
+		http.Error(w, "Error parsing RSS feed", http.StatusInternalServerError)
+		return
+	}
+
+\end{lstlisting}
+\end{figure}
+
+\newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={Go},caption={o.3.go - продолжение},label={lst:code7}]
+
+	tmpl, err := template.ParseFiles("/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.3/news.html")
+	if err != nil {
+		http.Error(w, "Error loading template", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	err = tmpl.Execute(w, feed)
+	if err != nil {
+		http.Error(w, "Error executing template", http.StatusInternalServerError)
+		return
+	}
+}
+
+func main() {
+	http.HandleFunc("/", FormHandler)
+	http.HandleFunc("/news", NewsHandler)
+
+	err := http.ListenAndServe(":9000", nil)
+	if err != nil {
+		fmt.Println("Server error:", err)
+	}
+}
+\end{lstlisting}
+\end{figure}
+
+\newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={HTML},caption={form.html},label={lst:code8}]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Entering an RSS Feed</title>
+</head>
+<body>
+<h1>Enter RSS Feed URL</h1>
+<form action="/parse" method="post">
+    <label for="rssUrl">RSS feed URL:</label>
+    <input type="text" id="rssUrl" name="rssUrl" required>
+    <input type="submit" value="Send">
+</form>
+</body>
+</html>
+\end{lstlisting}
+\end{figure}
+
+\newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={HTML},caption={news.html},label={lst:code9}]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Links to news</title>
+</head>
+<body>
+<h1>Links to news:</h1>
+<ul>
+  {{range .Items}}
+  <li><a href="{{.Link}}">{{.Title}}</a></li>
+  {{end}}
+</ul>
+</body>
+</html>
+\end{lstlisting}
+\end{figure}
 
 
 

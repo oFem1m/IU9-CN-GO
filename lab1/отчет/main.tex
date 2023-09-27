@@ -164,7 +164,7 @@
 \begin{center}
 \Large {\bf Лабораторная работа № 1} \\ 
 \large {\bf по курсу <<Компьютерные сети>>} \\
-\large <<web-сервера>> 
+\large <<Простейший протокол прикладного уровня>> 
 \end{center}\normalsize
 
 \vspace{8em}
@@ -194,314 +194,310 @@
 \setlength{\tabcolsep}{3pt}
 \newpage
 \setcounter{page}{2}
-
 \section{Задание}\label{Sect::task}
-Рассматривается задача разработки web-сервера на языке GO на основе пакета net/http. 
-Необходимо:
-\begin{itemize}
-\item Реализовать web-сервер и запустить на заданном порте.
-\item Изучить принимаемые web-сервером параметры, реализовать передачу данных методом РОST. Вывести значения введенные в форму
-\item Реализовать вывод форматированного гипертекста с контекстным меню в виде гиперссылок, при клике на гиперссылку должна выполняться подмена контента;
-\end{itemize}
-Далее рассматривается задача разработки приложения на языке GO реализующего синтаксический разбор XML файла формата RSS. 
-Необходимо Реализовать получение данных из различных RSS- каналов по вариантам. Сравнить результаты разбора и сделать выводы.
-В итоге необходимо разработать web-сервер, который выполняет соединение с удаленным (удаленными) серверами RSS-новостей и возвращает результаты обработки данных в структурированном виде (страница гипертекста) web-клиенту, в нашем случае в браузер по вариантам.
-\section{Результаты}\label{Sect::res}
-
-Исходный код программы представлен в листингах~\ref{lst:code1}--~\ref{lst:code2}--~\ref{lst:code3}.
+Целью работы является знакомство с принципами разработки протоколов прикладного уровня и их реализацией на языке Go. 
+Необходимо реализовать протокол редактирования предложения с возможностью вставлять и удалять слова
+Исходный код программы представлен в листингах~\ref{lst:code1}--~\ref{lst:code2}--~\ref{lst:code3}--~\ref{lst:code4}--~\ref{lst:code5}--~\ref{lst:code6}.
 
 \begin{figure}[!htb]
-\begin{lstlisting}[language={Go},caption={o.1.go},label={lst:code1}]
+\begin{lstlisting}[language={Go},caption={proto.go},label={lst:code1}]
+package proto
+
+import "encoding/json"
+
+type Request struct {
+	Command string `json:"command"`
+	Data *json.RawMessage `json:"data"`
+}
+
+type Response struct {
+	Status string `json:"status"`
+	Data *json.RawMessage `json:"data"`
+}
+
+type Word struct {
+	Word string `json:"word"`
+	Key string `json:"num"`
+}
+
+\end{lstlisting}
+\end{figure}
+
+\newpage
+
+\begin{figure}[!htb]
+\begin{lstlisting}[language={Go},caption={server.go},label={lst:code2}]
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
-	"html/template"
-	"io/ioutil"
-	"net/http"
-	"sync"
+	"github.com/mgutz/logxi/v1"
+	"net"
+	"strings"
 )
 
-var data struct {
-	Name string
-	Age  string
+import "file/lab1/src/proto"
+
+type Client struct {
+	logger log.Logger       
+	conn   *net.TCPConn      
+	enc    *json.Encoder     
+	sent   map[string]string 
 }
 
-var mutex sync.Mutex
-
-func FormHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		name := r.FormValue("name")
-		age := r.FormValue("age")
-
-		mutex.Lock()
-		data.Name = name
-		data.Age = age
-		mutex.Unlock()
-
-		http.Redirect(w, r, "/data", http.StatusSeeOther)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	http.ServeFile(w, r, "/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.1/form.html")
-}
-
-func DataHandler(w http.ResponseWriter, r *http.Request) {
-	mutex.Lock()
-	defer mutex.Unlock()
-\end{lstlisting}
-\end{figure}
-
-\newpage
-
-\begin{figure}[!htb]
-\begin{lstlisting}[language={Go},caption={o.1.go - продолжение},label={lst:code2}]
-	htmlContent, err := ioutil.ReadFile("/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.1/data.html")
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	tmpl, err := template.New("data").Parse(string(htmlContent))
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	err = tmpl.Execute(w, data)
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+func NewClient(conn *net.TCPConn) *Client {
+	return &Client{
+		logger: log.New(fmt.Sprintf("client %s", conn.RemoteAddr().String())),
+		conn:   conn,
+		enc:    json.NewEncoder(conn),
+		sent:   make(map[string]string),
 	}
 }
 
-func main() {
-	http.HandleFunc("/", FormHandler)
-	http.HandleFunc("/data", DataHandler)
-
-	err := http.ListenAndServe(":9000", nil)
-	if err != nil {
-		fmt.Println("Server error:", err)
-	}
-}
-\end{lstlisting}
-\end{figure}
-
-\newpage
-\begin{figure}[!htb]
-\begin{lstlisting}[language={HTML},caption={form.html},label={lst:code3}]
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Form</title>
-</head>
-<body>
-<h1>Enter the data:</h1>
-<form action="/" method="post">
-  <label for="name">Name:</label>
-  <input type="text" id="name" name="name"><br><br>
-
-  <label for="age">Age:</label>
-  <input type="text" id="age" name="age"><br><br>
-
-  <input type="submit" value="Send">
-</form>
-</body>
-</html>
-\end{lstlisting}
-\end{figure}
-\newpage
-\begin{figure}[!htb]
-\begin{lstlisting}[language={HTML},caption={data.html},label={lst:code4}]
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Form data</title>
-</head>
-<body>
-<h1>Form data:</h1>
-<p>Name: {{.Name}}</p>
-<p>Age: {{.Age}}</p>
-</body>
-</html>
-
-\end{lstlisting}
-\end{figure}
-\newpage
-\begin{figure}[!htb]
-\begin{lstlisting}[language={Go},caption={o.2.go},label={lst:code5}]
-package main
-
-import (
-	"fmt"
-	"github.com/mmcdole/gofeed"
-	"log"
-)
-
-func main() {
-	fp := gofeed.NewParser()
-
-	rssUrls := []string{
-		"https://vesti-k.ru/rss/",
-	}
-
-	for _, url := range rssUrls {
-		feed, err := fp.ParseURL(url)
-		if err != nil {
-			log.Fatalf("Error parsing RSS from URL %s: %v\n", url, err)
-		}
-
-		fmt.Printf("Title : %s\n", feed.Title)
-		fmt.Printf("Description : %s\n", feed.Description)
-		fmt.Printf("Number of Items : %d\n", len(feed.Items))
-
-		for i, item := range feed.Items {
-			fmt.Println()
-			fmt.Printf("Item Number : %d\n", i)
-			fmt.Printf("Title : %s\n", item.Title)
-			fmt.Printf("Link : %s\n", item.Link)
-			fmt.Printf("Description : %s\n", item.Description)
-			fmt.Printf("Published Date : %s\n", item.Published)
+func (client *Client) serve() {
+	defer client.conn.Close()
+	decoder := json.NewDecoder(client.conn)
+	for {
+		var req proto.Request
+		if err := decoder.Decode(&req); err != nil {
+			client.logger.Error("cannot decode message", "reason", err)
+			break
+		} else {
+			client.logger.Info("received command", "command", req.Command)
+			if client.handleRequest(&req) {
+				client.logger.Info("shutting down connection")
+				break
+			}
 		}
 	}
 }
-\end{lstlisting}
-\end{figure}
 
-\newpage
-
-\begin{figure}[!htb]
-\begin{lstlisting}[language={Go},caption={o.3.go},label={lst:code6}]
-package main
-
-import (
-	"fmt"
-	"github.com/mmcdole/gofeed"
-	"html/template"
-	"net/http"
-	"sync"
-)
-
-var data struct {
-	RssUrl string
-}
-
-var mutex sync.Mutex
-
-func FormHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		rssUrl := r.FormValue("rssUrl")
-
-		mutex.Lock()
-		data.RssUrl = rssUrl
-		mutex.Unlock()
-
-		http.Redirect(w, r, "/news", http.StatusSeeOther)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	http.ServeFile(w, r, "/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.3/form.html")
-}
-
-func NewsHandler(w http.ResponseWriter, r *http.Request) {
-	mutex.Lock()
-	rssUrl := data.RssUrl
-	mutex.Unlock()
-
-	fp := gofeed.NewParser()
-	feed, err := fp.ParseURL(rssUrl)
-	if err != nil {
-		http.Error(w, "Error parsing RSS feed", http.StatusInternalServerError)
-		return
-	}
 
 \end{lstlisting}
 \end{figure}
 
 \newpage
 \begin{figure}[!htb]
-\begin{lstlisting}[language={Go},caption={o.3.go - продолжение},label={lst:code7}]
+\begin{lstlisting}[language={Go},caption={server.go - продолжение},label={lst:code3}]
+func (client *Client) handleRequest(req *proto.Request) bool {
+	switch req.Command {
+	case "quit":
+		client.respond("ok", nil)
+		return true
+	case "add":
+		errorMsg := ""
+		if req.Data == nil {
+			errorMsg = "data field is absent"
+		} else {
+			var word proto.Word
+			if err := json.Unmarshal(*req.Data, &word); err != nil {
+				errorMsg = "malformed data field"
+			} else {
+				client.logger.Info("adding a word", "value", word.Word, "key", word.Key)
+				client.sent[word.Key] = word.Word
+			}
+		}
+		if errorMsg == "" {
+			client.respond("ok", nil)
+		} else {
+			client.logger.Error("adding failed", "reason", errorMsg)
+			client.respond("failed", errorMsg)
+		}
+	case "del":
+		if req.Data == nil {
+			client.logger.Error("deletion failed", "reason", "key is missing in data field")
+			client.respond("failed", "key is missing in data field")
+		} else {
+			keyToDelete := strings.Trim(string(*req.Data), "\"")
+			deletedWord, ok := client.sent[keyToDelete]
+			if ok {
+				delete(client.sent, keyToDelete)
+				client.respond("result", &proto.Word{
+					Key:  keyToDelete,
+					Word: deletedWord,
+				})
+			} else {
+				client.logger.Error("deletion failed", "reason", "key not found")
+				client.respond("failed", "key not found")
+			}
+		}
+	case "sent":
+		concatenatedValues := ""
+		for _, value := range client.sent {
+			concatenatedValues += value + " "
+		}
+		client.respond("result", &proto.Word{
+			Key:  "sentence",
+			Word: concatenatedValues,
+		})
 
-	tmpl, err := template.ParseFiles("/home/alex/BMSTU_git/IU9-CN-GO/lab1/0.3/news.html")
-	if err != nil {
-		http.Error(w, "Error loading template", http.StatusInternalServerError)
-		return
+	
+\end{lstlisting}
+\end{figure}
+\newpage
+\begin{figure}[!htb]
+\begin{lstlisting}[language={Go},caption={server.go - продолжение},label={lst:code4}]
+default:
+		client.logger.Error("unknown command")
+		client.respond("failed", "unknown command")
 	}
+	return false
+}
 
-	w.Header().Set("Content-Type", "text/html")
-	err = tmpl.Execute(w, feed)
-	if err != nil {
-		http.Error(w, "Error executing template", http.StatusInternalServerError)
-		return
-	}
+func (client *Client) respond(status string, data interface{}) {
+	var raw json.RawMessage
+	raw, _ = json.Marshal(data)
+	client.enc.Encode(&proto.Response{status, &raw})
 }
 
 func main() {
-	http.HandleFunc("/", FormHandler)
-	http.HandleFunc("/news", NewsHandler)
+	var addrStr string
+	flag.StringVar(&addrStr, "addr", "127.0.0.1:6000", "specify ip address and port")
+	flag.Parse()
 
-	err := http.ListenAndServe(":9000", nil)
-	if err != nil {
-		fmt.Println("Server error:", err)
+	if addr, err := net.ResolveTCPAddr("tcp", addrStr); err != nil {
+		log.Error("address resolution failed", "address", addrStr)
+	} else {
+		log.Info("resolved TCP address", "address", addr.String())
+
+		if listener, err := net.ListenTCP("tcp", addr); err != nil {
+			log.Error("listening failed", "reason", err)
+		} else {
+			for {
+				if conn, err := listener.AcceptTCP(); err != nil {
+					log.Error("cannot accept connection", "reason", err)
+				} else {
+					log.Info("accepted connection", "address", conn.RemoteAddr().String())
+
+					go NewClient(conn).serve()
+				}
+			}
+		}
 	}
 }
 \end{lstlisting}
 \end{figure}
-
 \newpage
 \begin{figure}[!htb]
-\begin{lstlisting}[language={HTML},caption={form.html},label={lst:code8}]
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Entering an RSS Feed</title>
-</head>
-<body>
-<h1>Enter RSS Feed URL</h1>
-<form action="/parse" method="post">
-    <label for="rssUrl">RSS feed URL:</label>
-    <input type="text" id="rssUrl" name="rssUrl" required>
-    <input type="submit" value="Send">
-</form>
-</body>
-</html>
+\begin{lstlisting}[language={Go},caption={client.go},label={lst:code5}]
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"github.com/skorobogatov/input"
+	"net"
+)
+
+import "file/lab1/src/proto"
+
+func interact(conn *net.TCPConn) {
+	defer conn.Close()
+	encoder, decoder := json.NewEncoder(conn), json.NewDecoder(conn)
+	for {
+		fmt.Printf("command = ")
+		command := input.Gets()
+		switch command {
+		case "quit":
+			send_request(encoder, "quit", nil)
+			return
+		case "add":
+			var word proto.Word
+			fmt.Printf("word = ")
+			word.Word = input.Gets()
+			fmt.Printf("key = ")
+			word.Key = input.Gets()
+			send_request(encoder, "add", &word)
+		case "del":
+			fmt.Printf("key = ")
+			var key = input.Gets()
+			send_request(encoder, "del", key)
+		case "sent":
+			send_request(encoder, "sent", nil)
+		default:
+			fmt.Printf("error: unknown command\n")
+			continue
+		}
+		var resp proto.Response
+		if err := decoder.Decode(&resp); err != nil {
+			fmt.Printf("error: %v\n", err)
+			break
+		}
 \end{lstlisting}
 \end{figure}
 
 \newpage
+
 \begin{figure}[!htb]
-\begin{lstlisting}[language={HTML},caption={news.html},label={lst:code9}]
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Links to news</title>
-</head>
-<body>
-<h1>Links to news:</h1>
-<ul>
-  {{range .Items}}
-  <li><a href="{{.Link}}">{{.Title}}</a></li>
-  {{end}}
-</ul>
-</body>
-</html>
+\begin{lstlisting}[language={Go},caption={client.go - продолжение},label={lst:code6}]
+switch resp.Status {
+		case "ok":
+			fmt.Printf("ok\n")
+		case "failed":
+			if resp.Data == nil {
+				fmt.Printf("error: data field is absent in response\n")
+			} else {
+				var errorMsg string
+				if err := json.Unmarshal(*resp.Data, &errorMsg); err != nil {
+					fmt.Printf("error: malformed data field in response\n")
+				} else {
+					fmt.Printf("failed: %s\n", errorMsg)
+				}
+			}
+		case "result":
+			if resp.Data == nil {
+				fmt.Printf("error: data field is absent in response\n")
+			} else {
+				var word proto.Word
+				if err := json.Unmarshal(*resp.Data, &word); err != nil {
+					fmt.Printf("error: malformed data field in response\n")
+				} else {
+					fmt.Printf("result: word \"%s\" with key = %s \n", word.Word, word.Key)
+				}
+			}
+		default:
+			fmt.Printf("error: server reports unknown status %q\n", resp.Status)
+		}
+	}
+}
+func send_request(encoder *json.Encoder, command string, data interface{}) {
+	var raw json.RawMessage
+	raw, _ = json.Marshal(data)
+	encoder.Encode(&proto.Request{command, &raw})
+}
+
+func main() {
+	var addrStr string
+	flag.StringVar(&addrStr, "addr", "127.0.0.1:6000", "specify ip address and port")
+	flag.Parse()
+	if addr, err := net.ResolveTCPAddr("tcp", addrStr); err != nil {
+		fmt.Printf("error: %v\n", err)
+	} else if conn, err := net.DialTCP("tcp", nil, addr); err != nil {
+		fmt.Printf("error: %v\n", err)
+	} else {
+		interact(conn)
+	}
+}
+
 \end{lstlisting}
 \end{figure}
 
-
+\newpage
 
 \begin{figure}[!htb]
 	\centering
-	\includegraphics[width=0.8\textwidth]{result.png}
-\caption{Результат}
+	\includegraphics[width=0.8\textwidth]{res1.png}
+\caption{Сервер}
 \label{fig:img1}
+\end{figure}
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[width=0.8\textwidth]{res2.png}
+\caption{Клиент}
+\label{fig:img2}
 \end{figure}
 
 

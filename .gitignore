@@ -2,5 +2,5 @@
 /.idea/
 #lab1
 /lab1/pkg/
-/lab1/bin/server
-/lab1/bin/client
+/lab1/bin/server/
+/lab1/bin/client/

@@ -100,6 +100,9 @@ func main() {
 	}
 
 	if conn != nil {
-		conn.Close()
+		err := conn.Close()
+		if err != nil {
+			return
+		}
 	}
 }

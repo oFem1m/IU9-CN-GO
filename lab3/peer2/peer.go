@@ -73,7 +73,12 @@ func main() {
 		fmt.Printf("Error: %s\n", err)
 		return
 	}
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+
+		}
+	}(listener)
 
 	fmt.Printf("Peer listening on port %s\n", port)
 
@@ -89,7 +94,12 @@ func main() {
 }
 
 func handleConnection(conn net.Conn, hashTable *HashTable, neighbors *[]Neighbor) {
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
 
 	// Получение IP и порта соседа
 	remoteAddr := conn.RemoteAddr().String()
@@ -116,7 +126,7 @@ func handleConnection(conn net.Conn, hashTable *HashTable, neighbors *[]Neighbor
 					// Отправляем запрос всем соседям, исключая отправителя
 					for _, neighbor := range *neighbors {
 						if neighbor.IP != msg.IP || neighbor.Port != msg.Port {
-							sendRequest(neighbor.IP, neighbor.Port, msg, neighbors)
+							sendRequest(neighbor.IP, neighbor.Port, msg)
 						}
 					}
 				}
@@ -129,7 +139,7 @@ func handleConnection(conn net.Conn, hashTable *HashTable, neighbors *[]Neighbor
 					// Отправляем запрос всем соседям, исключая отправителя
 					for _, neighbor := range *neighbors {
 						if neighbor.IP != msg.IP || neighbor.Port != msg.Port {
-							sendRequest(neighbor.IP, neighbor.Port, msg, neighbors)
+							sendRequest(neighbor.IP, neighbor.Port, msg)
 						}
 					}
 				}
@@ -155,7 +165,7 @@ func handleConnection(conn net.Conn, hashTable *HashTable, neighbors *[]Neighbor
 	}
 }
 
-func sendRequest(ip, port string, msg Message, neighbors *[]Neighbor) {
+func sendRequest(ip, port string, msg Message) {
 	msg.Forward = true
 	msg.IP = ""
 	msg.Port = ""
@@ -165,7 +175,12 @@ func sendRequest(ip, port string, msg Message, neighbors *[]Neighbor) {
 		fmt.Printf("Error connecting to neighbor %s: %s\n", neighborAddr, err)
 		return
 	}
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		fmt.Printf("Error encoding message: %s\n", err)

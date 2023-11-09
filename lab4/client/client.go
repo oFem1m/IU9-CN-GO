@@ -36,7 +36,12 @@ func main() {
 		fmt.Println("Failed to connect to the SSH server:", err)
 		return
 	}
-	defer client.Close()
+	defer func(client *ssh.Client) {
+		err := client.Close()
+		if err != nil {
+
+		}
+	}(client)
 
 	currentDir := "" // Текущая директория
 
@@ -57,7 +62,10 @@ func main() {
 		switch {
 		case strings.HasPrefix(command, "ls"):
 			output, err := session.CombinedOutput("ls " + currentDir)
-			session.Close()
+			err = session.Close()
+			if err != nil {
+				return
+			}
 			if err != nil {
 				fmt.Println("Failed to list directory:", err)
 			} else {
@@ -72,7 +80,10 @@ func main() {
 			}
 			output, err := session.CombinedOutput("cd " + Path + " && pwd")
 			currentDir = Path
-			session.Close()
+			err = session.Close()
+			if err != nil {
+				return
+			}
 			if err != nil {
 				fmt.Println("Failed to change directory:", err)
 			} else {

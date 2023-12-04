@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"runtime"
-	"syscall"
-
 	"github.com/gorilla/websocket"
-	"golang.org/x/sys/windows"
+	"io/ioutil"
+	"net/http"
+	"path/filepath"
+	"runtime"
+	"strconv"
 )
 
 var upgrader = websocket.Upgrader{
@@ -16,11 +16,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type InputData struct {
-	PID int `json:"pid"`
-}
-
-type OutputData struct {
+type Process struct {
+	PID         int    `json:"pid"`
 	ProcessName string `json:"processName,omitempty"`
 	Error       string `json:"error,omitempty"`
 }
@@ -30,51 +27,12 @@ func getProcessName(pid int) (string, error) {
 
 	switch runtime.GOOS {
 	case "linux", "darwin":
-		// Открываем /proc/<pid>/comm для получения имени процесса в Linux и macOS
-		filePath := fmt.Sprintf("/proc/%d/comm", pid)
-		file, err := windows.Open(filePath, syscall.O_RDONLY, 0)
+		commPath := filepath.Join("/proc", strconv.Itoa(pid), "comm")
+		data, err := ioutil.ReadFile(commPath)
 		if err != nil {
 			return "", err
 		}
-		defer func(fd windows.Handle) {
-			err := windows.Close(fd)
-			if err != nil {
-
-			}
-		}(file)
-
-		// Читаем имя процесса из файла
-		buffer := make([]byte, 1024)
-		n, err := windows.Read(file, buffer)
-		if err != nil {
-			return "", err
-		}
-
-		processName = string(buffer[:n])
-	case "windows":
-		handle, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, uint32(pid))
-		if err != nil {
-			return "", fmt.Errorf("error opening process: %v", err)
-		}
-		defer func(handle windows.Handle) {
-			err := windows.CloseHandle(handle)
-			if err != nil {
-
-			}
-		}(handle)
-
-		// Выделяем динамическую память для буфера
-		bufferSize := windows.MAX_PATH
-		buffer := make([]uint16, bufferSize)
-
-		var length uint32
-
-		err = windows.QueryFullProcessImageName(handle, 0, &buffer[0], &length)
-		if err != nil {
-			return "", fmt.Errorf("error getting process name: %v", err)
-		}
-
-		processName = syscall.UTF16ToString(buffer[:length])
+		processName = string(data)
 	default:
 		return "", fmt.Errorf("unsupported operating system")
 	}
@@ -96,29 +54,26 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	}(conn)
 
 	for {
-		var inputData InputData
+		var process Process
 
 		// Чтение входных данных от клиента
-		err := conn.ReadJSON(&inputData)
+		err := conn.ReadJSON(&process)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
-		// Выполнение вычислений
-		processName, err := getProcessName(inputData.PID)
-		outputData := OutputData{}
-
+		processName, err := getProcessName(process.PID)
 		if err != nil {
 			// Если произошла ошибка, добавляем ее в OutputData
-			outputData.Error = err.Error()
+			process.Error = err.Error()
 		} else {
 			// Если ошибки нет, добавляем имя процесса
-			outputData.ProcessName = processName
+			process.ProcessName = processName
 		}
 
 		// Отправка данных обратно клиенту
-		err = conn.WriteJSON(outputData)
+		err = conn.WriteJSON(process)
 		if err != nil {
 			fmt.Println(err)
 			break

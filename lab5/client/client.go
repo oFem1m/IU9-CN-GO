@@ -8,11 +8,8 @@ import (
 	"strconv"
 )
 
-type InputData struct {
-	PID int `json:"pid"`
-}
-
-type OutputData struct {
+type Process struct {
+	PID         int    `json:"pid"`
 	ProcessName string `json:"processName,omitempty"`
 	Error       string `json:"error,omitempty"`
 }
@@ -31,7 +28,7 @@ func main() {
 	}(conn)
 
 	for {
-		// Чтение PID из стандартного ввода
+		// Чтение PID
 		fmt.Print("Enter PID: ")
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
@@ -44,31 +41,31 @@ func main() {
 		}
 
 		// Подготовка данных для отправки серверу
-		inputData := InputData{
+		processData := Process{
 			PID: pid,
 		}
 
 		// Отправка данных серверу
-		err = conn.WriteJSON(inputData)
+		err = conn.WriteJSON(processData)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
 		// Получение данных от сервера
-		var outputData OutputData
-		err = conn.ReadJSON(&outputData)
+		var responseData Process
+		err = conn.ReadJSON(&responseData)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
 		// Проверка наличия ошибки
-		if outputData.Error != "" {
-			fmt.Printf("Error: %s\n", outputData.Error)
+		if responseData.Error != "" {
+			fmt.Printf("Error: %s\n", responseData.Error)
 		} else {
 			// Вывод результатов
-			fmt.Printf("Process Name: %s\n", outputData.ProcessName)
+			fmt.Printf("Process Name: %s", responseData.ProcessName)
 		}
 	}
 }

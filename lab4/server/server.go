@@ -2,144 +2,154 @@ package main
 
 import (
 	"fmt"
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
+	"github.com/gliderlabs/ssh"
+	"golang.org/x/crypto/ssh/terminal"
 	"io"
-	"io/ioutil"
-	"net"
+	"log"
 	"os"
 	"os/exec"
+	"strings"
 )
 
-func main() {
-	config := &ssh.ServerConfig{
-		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			// Пример простой авторизации. Рекомендуется использовать более безопасные методы.
-			if c.User() == "Me" && string(pass) == "123" {
-				return nil, nil
+var path = "./lab4/server/server_space/"
+
+func handleSession(session ssh.Session) {
+	term := terminal.NewTerminal(session, "enter command >> ")
+	io.WriteString(session, fmt.Sprintf("Successfull login, %s\n", session.User()))
+	for {
+		command, err := term.ReadLine()
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("Received %s: %s", session.User(), command)
+		selectCommand(session, command)
+
+	}
+}
+
+func selectCommand(session ssh.Session, command string) {
+	switch command {
+	case "exit":
+		return
+	case "ping":
+		output, err := runCommand("ping", "-t", "4", "google.com")
+		if err != nil {
+			io.WriteString(session, fmt.Sprintf("Error ping: %s\n", err))
+		} else {
+			io.WriteString(session, string(output))
+		}
+	default:
+		args := strings.Fields(command)
+		if len(args) > 0 {
+			switch args[0] {
+
+			case "mkdir":
+				if len(args) < 2 {
+					io.WriteString(session, "You must specify dir name\n")
+				} else {
+					err := os.Mkdir(path+args[1], 0755)
+					if err != nil {
+						io.WriteString(session, fmt.Sprintf("Failed to create dir: %s\n", err))
+					} else {
+						io.WriteString(session, "Dir created\n")
+					}
+				}
+
+			case "rmdir":
+				if len(args) < 2 {
+					io.WriteString(session, "You need to specify dir to delete\n")
+				} else {
+					err := os.Remove(path + args[1])
+					if err != nil {
+						io.WriteString(session, fmt.Sprintf("Failed to delete: %s\n", err))
+					} else {
+						io.WriteString(session, "Dir successfully deleted\n")
+					}
+				}
+
+			case "ls":
+				files, err := os.ReadDir(path)
+				if err != nil {
+					io.WriteString(session, fmt.Sprintf("Error reading dir: %s\n", err))
+				} else {
+					var output strings.Builder
+					for _, file := range files {
+						output.WriteString(file.Name())
+						output.WriteString("\n")
+					}
+					io.WriteString(session, output.String())
+				}
+
+			case "mv":
+				if len(args) < 3 {
+					io.WriteString(session, "You need to specify src and dst paths\n")
+				} else {
+					err := os.Rename(path+args[1], path+args[2]+"/"+args[1])
+					if err != nil {
+						io.WriteString(session, fmt.Sprintf("Error while moving: %s\n", err))
+					} else {
+						io.WriteString(session, "File successfully moved\n")
+					}
+				}
+
+			case "rm":
+				if len(args) < 2 {
+					io.WriteString(session, "You need to specify file to delete\n")
+				} else {
+					err := os.Remove(path + args[1])
+					if err != nil {
+						io.WriteString(session, fmt.Sprintf("Error while deleting: %s\n", err))
+					} else {
+						io.WriteString(session, "Successfully deleted\n")
+					}
+				}
+			case "cd":
+				if len(args) < 2 {
+					io.WriteString(session, "You need to specify dir to change\n")
+				} else {
+					_, err := os.ReadDir(path + args[1])
+					if err != nil {
+						io.WriteString(session, fmt.Sprintf("Error - no such dir: %s\n", err))
+					} else {
+						io.WriteString(session, "Dir changed successfully\n")
+						path += args[1] + "/"
+					}
+				}
+
+			default:
+				io.WriteString(session, "Wrong command\n")
 			}
-			return nil, fmt.Errorf("authentication failed")
+		} else {
+			io.WriteString(session, "Wrong command\n")
+		}
+	}
+}
+
+func runCommand(name string, args ...string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return nil, fmt.Errorf("command execution failed with: %s", err)
+	}
+	return output, nil
+}
+
+func main() {
+	server := ssh.Server{
+		Addr: "localhost:2222",
+		Handler: func(s ssh.Session) {
+			handleSession(s)
+		},
+		PasswordHandler: func(ctx ssh.Context, password string) bool {
+			log.Printf("User authenication %s", ctx.User())
+			return true
 		},
 	}
+	log.Println("SSH started at port 2222")
 
-	privateBytes, err := ioutil.ReadFile("./lab4/server/key")
+	err := server.ListenAndServe()
 	if err != nil {
-		fmt.Println("Failed to load private key:", err)
-		return
-	}
-
-	private, err := ssh.ParsePrivateKey(privateBytes)
-	if err != nil {
-		fmt.Println("Failed to parse private key:", err)
-		return
-	}
-
-	config.AddHostKey(private)
-
-	// Запуск SSH сервера
-	listener, err := net.Listen("tcp", "localhost:2222")
-	if err != nil {
-		fmt.Println("Failed to listen on 2222:", err)
-		return
-	}
-	defer listener.Close()
-
-	fmt.Println("SSH server listening on localhost:2222")
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println("Failed to accept incoming connection:", err)
-			continue
-		}
-		go handleConnection(conn, config)
-	}
-}
-
-func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
-	defer conn.Close()
-
-	sshConn, chans, reqs, err := ssh.NewServerConn(conn, config)
-	if err != nil {
-		fmt.Println("Failed to handshake:", err)
-		return
-	}
-
-	fmt.Println("SSH connection established from", sshConn.RemoteAddr())
-
-	// Обработка запросов
-	go ssh.DiscardRequests(reqs)
-
-	// Обработка каналов
-	for newChannel := range chans {
-		go handleChannel(newChannel)
-	}
-}
-
-func handleChannel(newChannel ssh.NewChannel) {
-	if t := newChannel.ChannelType(); t != "session" {
-		newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
-		return
-	}
-
-	channel, requests, err := newChannel.Accept()
-	if err != nil {
-		fmt.Println("Failed to accept channel:", err)
-		return
-	}
-	defer channel.Close()
-
-	for req := range requests {
-		switch req.Type {
-		case "exec":
-			go handleExec(channel, req)
-		case "subsystem":
-			go handleSubsystem(channel, req)
-		default:
-			req.Reply(false, nil)
-		}
-	}
-}
-
-func handleExec(channel ssh.Channel, req *ssh.Request) {
-	cmd := exec.Command(string(req.Payload[4:]))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println("Command execution failed:", err)
-		channel.Write([]byte(fmt.Sprintf("Error: %s\n", err)))
-		return
-	}
-
-	channel.Write(output)
-}
-
-func handleSubsystem(channel ssh.Channel, req *ssh.Request) {
-	switch string(req.Payload[4:]) {
-	case "sftp":
-		go handleSFTP(channel)
-	default:
-		req.Reply(false, nil)
-	}
-}
-
-func handleSFTP(channel ssh.Channel) {
-	serverOptions := []sftp.ServerOption{
-		sftp.WithDebug(os.Stderr),
-	}
-
-	server, err := sftp.NewServer(
-		channel,
-		serverOptions...,
-	)
-	if err != nil {
-		fmt.Println("Failed to create SFTP server:", err)
-		return
-	}
-	defer server.Close()
-
-	if err := server.Serve(); err == io.EOF {
-		fmt.Println("SFTP session closed by client")
-	} else if err != nil {
-		fmt.Println("SFTP server exited with error:", err)
+		log.Fatalf("Error starting server: %v", err)
 	}
 }

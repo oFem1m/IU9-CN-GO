@@ -5,7 +5,6 @@ import (
 	"github.com/gliderlabs/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -136,50 +135,12 @@ func runCommand(name string, args ...string) ([]byte, error) {
 	return output, nil
 }
 
-func keyAuth(ctx ssh.Context, key ssh.PublicKey) bool {
-	// Read the authorized keys file
-	authorizedKeys, err := ioutil.ReadFile(authorizedKeysPath)
-	if err != nil {
-		log.Printf("Error reading authorized keys file: %v", err)
-		return false
-	}
-
-	// Check if the provided key is present in the authorized keys file
-	for len(authorizedKeys) > 0 {
-		var next []byte
-		line := authorizedKeys
-		if i := strings.IndexByte(string(line), '\n'); i >= 0 {
-			line, next = line[:i+1], line[i+1:]
-		} else {
-			authorizedKeys = nil
-		}
-
-		// Parse the public key
-		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(line)
-		if err != nil {
-			log.Printf("Error parsing authorized key: %v", err)
-			continue
-		}
-
-		// Compare the provided key with the authorized key
-		if ssh.KeysEqual(key, pubKey) {
-			return true
-		}
-
-		authorizedKeys = next
-	}
-
-	log.Printf("Key authentication failed for user %s", ctx.User())
-	return false
-}
-
 func main() {
 	server := ssh.Server{
 		Addr: "localhost:2222",
 		Handler: func(s ssh.Session) {
 			handleSession(s)
 		},
-		PublicKeyHandler: keyAuth,
 		PasswordHandler: func(ctx ssh.Context, password string) bool {
 			log.Printf("User authentication %s", ctx.User())
 			return true

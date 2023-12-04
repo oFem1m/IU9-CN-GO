@@ -32,7 +32,7 @@ func selectCommand(session ssh.Session, command string) {
 	case "exit":
 		return
 	case "ping":
-		output, err := runCommand("ping", "-t", "4", "google.com")
+		output, err := runCommand("ping", "-c", "4", "google.com")
 		if err != nil {
 			io.WriteString(session, fmt.Sprintf("Error ping: %s\n", err))
 		} else {

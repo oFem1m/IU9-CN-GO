@@ -38,7 +38,7 @@ func main() {
 		// Парсинг команды
 		parts := strings.Fields(command)
 		if parts[0] == "PEER" && len(parts) == 2 {
-			peerAddress = "localhost:" + parts[1]
+			peerAddress = parts[1]
 			// Устанавливаем соединение с выбранным пиром
 			conn, err = net.Dial("tcp", peerAddress)
 			if err != nil {

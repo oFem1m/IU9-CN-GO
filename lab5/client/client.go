@@ -15,7 +15,7 @@ type Process struct {
 }
 
 func main() {
-	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:8080", nil)
+	conn, _, err := websocket.DefaultDialer.Dial("ws://185.255.133.113:0303", nil)
 	if err != nil {
 		fmt.Println(err)
 		return

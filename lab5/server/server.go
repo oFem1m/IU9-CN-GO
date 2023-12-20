@@ -83,8 +83,8 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/", handleConnection)
-	fmt.Println("Server is listening on :8080")
-	err := http.ListenAndServe(":8080", nil)
+	fmt.Println("Server is listening on :0303")
+	err := http.ListenAndServe(":0303", nil)
 	if err != nil {
 		return
 	}

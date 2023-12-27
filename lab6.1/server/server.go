@@ -9,7 +9,7 @@ import (
 
 func main() {
 	var (
-		root = flag.String("root", "/home/alexandr/BMSTU_git/IU9-CN-GO/lab6/server/server_space", "Root directory to serve")
+		root = flag.String("root", "/home/alexandr/BMSTU_git/IU9-CN-GO/lab6.1/server/server_space", "Root directory to serve")
 		user = flag.String("user", "Sasha", "Username for login")
 		pass = flag.String("pass", "123", "Password for login")
 		port = flag.Int("port", 2121, "Port")
